@@ -1,0 +1,92 @@
+---
+title: 'Practical Machine Learning: Course Project'
+author: "y chahid"
+date: "10 April 2016"
+output: html_document
+---
+
+##Executive Summary
+
+In the following report we will see that using machine learning can help in investigating how well an activity is performed.  
+Following is a demonstration of a model that classifies with very high accuracy the 'how well' a weight lifting exercise is executed.  
+
+##Background
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. 
+These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. 
+One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. 
+
+In this project, our goal will be to predict how well weight lifting exercise is executed, by using data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. 
+They were asked to perform barbell lifts correctly and incorrectly in 5 different ways.
+ 
+##Load Data and Libraries
+
+```{r}
+suppressMessages(library(caret))
+set.seed(33333)
+training<-read.csv("pml-training.csv", na.strings=c("","#DIV/0!","NA"))
+testing<-read.csv("pml-testing.csv", na.strings=c("","#DIV/0!","NA"))
+```
+
+##Data exploration and Cleaning
+The dataset comes with a large number of variables, many of them contains a big percentage of NA values
+and there also other variables that are irrelevant (timestamps, line number, problem_id ..), that we will delete:
+
+```{r}
+dim(training)
+dim(testing)
+# delete first seven variables as being irrelevant,
+training<-training[,-c(1:7)]
+testing<-testing[,-c(1:7)]
+#count percentage of Na values for each column,
+rateNATr <- sapply(training, function(x) {sum(is.na(x)==TRUE)/length(x)})
+rateNATs <- sapply(testing, function(x) {sum(is.na(x)==TRUE)/length(x)})
+#extract variables with more than 80% non NA values= variables to keep
+keepTr <- names(which(rateNATr < 0.8))
+keepTs <- names(which(rateNATs < 0.8))
+#apply preprocess non NA rule on both training and test sets
+training <- training[, keepTr]
+testing <- testing[, keepTs]
+```
+
+## Split training and test sets
+```{r}
+inTrain <- createDataPartition (training$classe, p=0.7, list=FALSE)
+training.train <- training [inTrain ,]
+training.test <- training [-inTrain,]
+```
+
+##Fitting the model
+
+This is a classification problem, and random forests are highly recommended for this kind of modelling,
+we will fit a random forest model with the default k fold cross validation number, and 100 trees,
+we can readjust these values after evaluation.
+
+```{r}
+ctrl <- trainControl(method = "cv", number=10)
+rfmodel <- train(classe ~ ., data = training.train, method = "rf", trControl = ctrl, allowParallel=TRUE, ntree=100)
+print(rfmodel)
+```
+
+##Model evaluation
+Let's create a confusion matrix to check the accuracy of the model
+```{r}
+predict.test <- predict(rfmodel, newdata = training.test)
+confusionMatrix(data = predict.test, training.test$classe)
+```
+On our first try with random forest, we can see that we obtain a highly accurate model with a very small out of sample error.
+
+Just for information we visualize a list of the order of importance of contributing predictors:
+```{r}
+print(plot(varImp(rfmodel)))
+```
+
+## Prediction on new sample
+we will use the fitted model to predict on the new sample
+
+```{r}
+predict.new <- predict(rfmodel, testing)
+predict.new
+```
+##References
+<http://groupware.les.inf.puc-rio.br/har>
